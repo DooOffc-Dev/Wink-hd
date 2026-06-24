@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wink HD - Image Enhancer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        body { background: #0a0e17; color: #e2e8f0; }
+        .glass-card { background: rgba(10,14,23,0.85); backdrop-filter: blur(20px); border: 1px solid rgba(0,150,255,0.25); box-shadow: 0 20px 60px rgba(0,150,255,0.1); }
+        .btn-neon { background: linear-gradient(135deg, #0096ff, #0066cc); color: white; box-shadow: 0 0 25px rgba(0,150,255,0.3); }
+        .btn-neon:hover { transform: scale(1.02); box-shadow: 0 0 40px rgba(0,150,255,0.5); }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-thumb { background: #0096ff; border-radius: 10px; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="glass-card max-w-md w-full rounded-3xl p-8 shadow-2xl">
+        <div class="text-center mb-8">
+            <div class="inline-block p-3 bg-gradient-to-r from-[#0096ff] to-[#0066cc] rounded-2xl shadow-lg mb-3">
+                <i class="fas fa-wand-magic-sparkles text-white text-3xl"></i>
+            </div>
+            <h1 class="text-4xl font-extrabold bg-gradient-to-r from-[#0096ff] to-[#00ccff] bg-clip-text text-transparent">Wink HD</h1>
+            <p class="text-sm text-gray-400 mt-1">Image Enhancer - Ultra HD</p>
+        </div>
+
+        <div class="space-y-5">
+            <div class="border-2 border-dashed border-[#0096ff]/50 rounded-xl p-6 text-center hover:border-[#0096ff] transition-all cursor-pointer" id="dropArea">
+                <i class="fas fa-cloud-upload-alt text-4xl text-[#0096ff] mb-3"></i>
+                <p class="text-gray-400">Klik atau drag & drop gambar di sini</p>
+                <input type="file" id="imageInput" accept="image/*" class="hidden">
+            </div>
+
+            <div id="previewArea" class="hidden mt-4">
+                <img id="previewImage" class="w-full rounded-xl border border-[#0096ff]/30">
+            </div>
+
+            <button id="enhanceBtn" class="btn-neon w-full font-bold py-3.5 rounded-xl flex items-center justify-center gap-2" disabled>
+                <i class="fas fa-wand-magic-sparkles"></i> Enhance Image
+            </button>
+
+            <div id="loading" class="hidden text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-[#0096ff] border-t-transparent"></div>
+                <p class="text-[#0096ff] mt-2">Memproses gambar (30-60 detik)...</p>
+            </div>
+
+            <div id="resultArea" class="hidden mt-4 text-center">
+                <p class="text-green-400 font-medium mb-2">✅ Gambar berhasil di-enhance!</p>
+                <a id="downloadLink" href="#" target="_blank" class="btn-neon inline-block font-bold py-2 px-6 rounded-xl">
+                    <i class="fas fa-download"></i> Download HD
+                </a>
+            </div>
+
+            <div id="errorMsg" class="hidden text-center text-red-400 p-3 rounded-xl border border-red-500/50 bg-red-500/10">
+                <i class="fas fa-exclamation-circle mr-2"></i> <span id="errorText">Terjadi kesalahan</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dropArea = document.getElementById('dropArea');
+        const imageInput = document.getElementById('imageInput');
+        const previewArea = document.getElementById('previewArea');
+        const previewImage = document.getElementById('previewImage');
+        const enhanceBtn = document.getElementById('enhanceBtn');
+        const loading = document.getElementById('loading');
+        const resultArea = document.getElementById('resultArea');
+        const downloadLink = document.getElementById('downloadLink');
+        const errorMsg = document.getElementById('errorMsg');
+        const errorText = document.getElementById('errorText');
+
+        let selectedFile = null;
+
+        dropArea.addEventListener('click', () => imageInput.click());
+        dropArea.addEventListener('dragover', (e) => { e.preventDefault(); dropArea.classList.add('border-[#0096ff]'); });
+        dropArea.addEventListener('dragleave', () => dropArea.classList.remove('border-[#0096ff]'));
+        dropArea.addEventListener('drop', (e) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); });
+
+        imageInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+        function handleFile(file) {
+            if (!file) return;
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewArea.classList.remove('hidden');
+                dropArea.classList.add('hidden');
+                enhanceBtn.disabled = false;
+                resultArea.classList.add('hidden');
+                errorMsg.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        enhanceBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            
+            enhanceBtn.disabled = true;
+            loading.classList.remove('hidden');
+            resultArea.classList.add('hidden');
+            errorMsg.classList.add('hidden');
+
+            const reader = new FileReader();
+            reader.readAsDataURL(selectedFile);
+            reader.onload = async () => {
+                const base64 = reader.result;
+                try {
+                    const res = await fetch('/enhance', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ imageBase64: base64 })
+                    });
+                    
+                    if (!res.ok) throw new Error('Gagal enhance gambar');
+                    const data = await res.json();
+                    
+                    if (data.success) {
+                        downloadLink.href = data.resultUrl;
+                        resultArea.classList.remove('hidden');
+                    } else {
+                        throw new Error(data.error || 'Gagal');
+                    }
+                } catch (e) {
+                    errorText.textContent = '❌ Error: ' + e.message;
+                    errorMsg.classList.remove('hidden');
+                } finally {
+                    enhanceBtn.disabled = false;
+                    loading.classList.add('hidden');
+                }
+            };
+        });
+    </script>
+</body>
+</html>
